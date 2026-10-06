@@ -161,6 +161,50 @@
         .imp-b { background: #718096; padding: 12px; font-size: 14px; justify-content: center; }
         .imp-g { background: #27ae60; }
         .imp-r { background: #e74c3c; }
+    
+        /* ===== Таблиця: фіксовані колонки, ручка перетягування, вузький стовпець назви на телефоні ===== */
+        table { table-layout: fixed; }
+        th.c-chk { width: 44px; } th.c-num { width: 56px; } th.c-photo { width: 100px; } th.c-act { width: 80px; }
+        .c-chk, .c-act { text-align: center; }
+        .c-chk input { width: 25px; height: 25px; }
+        .c-name { min-width: 0; }
+        .place-name-link { display: inline-block; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+        .cell-coords { font-size: 14px; color: #a0aec0; margin-top: 5px; overflow-wrap: anywhere; }
+        .cell-desc { font-size: 13px; color: #718096; margin-top: 3px; overflow-wrap: anywhere; }
+        .drag-handle { text-align: center; color: #a0aec0; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .drag-handle:active { cursor: grabbing; }
+        .grip { font-size: 20px; line-height: 1; color: #b8c2cc; }
+        .num { font-weight: bold; margin-top: 2px; }
+        .draggable-row { cursor: default; }
+        @media (max-width: 700px) {
+            th.c-chk { width: 34px; } th.c-num { width: 34px; } th.c-photo { width: 58px; } th.c-act { width: 46px; }
+            thead th { font-size: 10px; padding: 8px 1px; }
+            td { padding: 8px 3px; }
+            .c-chk input { width: 22px; height: 22px; }
+            .cell-photo-img { width: 50px; height: 50px; }
+            .place-name-link { font-size: 14px; line-height: 1.25; }
+            .cell-coords { font-size: 11px; margin-top: 3px; }
+            .cell-desc { font-size: 11px; }
+            .btn-edit { width: 38px; height: 38px; padding: 0; font-size: 16px; justify-content: center; }
+            .grip { font-size: 18px; } .num { font-size: 12px; }
+            .media-item-edit { width: 72px; height: 72px; }
+        }
+
+        /* ===== Перетягування ===== */
+        .is-dragging { opacity: 0.35; }
+        tr.is-dragging td { background: #edf2f7; }
+        tr.drop-before td { box-shadow: inset 0 3px 0 #4285F4; }
+        tr.drop-after td { box-shadow: inset 0 -3px 0 #4285F4; }
+        .media-item-edit { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; cursor: grab; }
+        .media-item-edit.drop-before { box-shadow: -4px 0 0 #4285F4; }
+        .media-item-edit.drop-after { box-shadow: 4px 0 0 #4285F4; }
+        .drag-ghost { position: fixed !important; z-index: 6000; pointer-events: none; background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.3); opacity: .95; overflow: hidden; }
+        .ctx-item { white-space: pre-line; line-height: 1.35; }
+
+        /* ===== Видалення всередині форми редагування ===== */
+        .btn-del-full { display: none; width: 100%; margin-top: 8px; height: 40px; font-size: 14px; justify-content: center; background: #fff; color: #e74c3c; border: 2px solid #e74c3c; }
+        .btn-del-full.show { display: inline-flex; }
+        .btn-del-full:hover { background: #fdecea; }
     </style>
 </head>
 <body>
@@ -189,8 +233,7 @@
         <span class="mobile-title">📍 Реєстр місць</span>
         <div class="mobile-controls"><button class="btn-map-open" onclick="openMobileMap()">🗺 Карта</button>
             <a id="gmapsLink" class="link-btn btn-export" href="#" target="_blank">🗺 Маршрут</a><span class="route-parts"></span>
-            <button class="btn-save-file" onclick="saveToFile()">💾 Зберегти</button>
-            <button class="btn-save-file btn-data" onclick="exportData()" title="Завантажити лише дані (місця + фото) у файл .json">⬇ Експорт</button><button class="btn-save-file btn-data" onclick="document.getElementById('importFile').click()" title="Завантажити дані з файлу .json">⬆ Імпорт</button>
+            <button class="btn-save-file" onclick="openFileMenu(this)">📁 Файл ▾</button>
             <div class="start-toggle">
                 <input type="checkbox" id="returnToStart" onchange="syncReturn(this); updateLinks()">
                 <span>На старт</span>
@@ -200,11 +243,11 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 36px;"><input type="checkbox" id="mainToggle" onclick="handleMainToggle(this)"></th>
-                <th style="width: 44px;">№</th>
-                <th style="width: 70px;">Фото</th>
-                <th>Місце</th>
-                <th style="width: 90px;">Дії</th>
+                <th class="c-chk"><input type="checkbox" id="mainToggle" onclick="handleMainToggle(this)"></th>
+                <th class="c-num">№</th>
+                <th class="c-photo">Фото</th>
+                <th class="c-name-h">Місце</th>
+                <th class="c-act">Дії</th>
             </tr>
         </thead>
         <tbody id="placesTable"></tbody>
@@ -217,8 +260,7 @@
             <h1>📍 Додати місце</h1>
             <div class="top-controls desktop-only">
                 <a id="gmapsLinkDesktop" class="link-btn btn-export" href="#" target="_blank">Route Google Map</a><span class="route-parts"></span>
-                <button class="btn-save-file" onclick="saveToFile()">💾 Зберегти файл</button>
-                <button class="btn-save-file btn-data" onclick="exportData()" title="Завантажити лише дані (місця + фото) у файл .json">⬇ Експорт даних</button><button class="btn-save-file btn-data" onclick="document.getElementById('importFile').click()" title="Завантажити дані з файлу .json">⬆ Імпорт даних</button>
+                <button class="btn-save-file" onclick="openFileMenu(this)">📁 Файл ▾</button>
                 <div class="start-toggle">
                     <input type="checkbox" id="returnToStartDesktop" onchange="syncReturn(this); updateLinks()">
                     <span>Повернутися на старт</span>
@@ -254,6 +296,7 @@
                 <button id="saveBtn" class="btn-add" onclick="handleSave()">Додати місце</button>
                 <button id="cancelBtn" class="btn-cancel" onclick="clearForm()">Скасувати</button>
             </div>
+            <button id="deleteBtn" type="button" class="btn-del-full" onclick="deleteCurrent()">🗑 Видалити місце повністю</button>
         </div>
     </div>
     <div class="map-hint" id="mapHint">Клік по точці — вибрати/зняти · правий клік (довге натискання) — меню · двопальцевий рух тачпада — переміщення, щипок — масштаб</div>
@@ -285,8 +328,6 @@
     let currentEditMedia = [];
     let currentGalleryIndex = 0;
     let currentGalleryMedia = [];
-    let rowDragSrc = null;
-    let mediaDragSrc = null;
 
     // ===== IndexedDB =====
     let _db = null;
@@ -355,19 +396,6 @@
         places.forEach((p, i) => {
             const tr = document.createElement('tr');
             tr.className = 'draggable-row';
-            tr.draggable = !!(window.matchMedia && window.matchMedia('(pointer: fine)').matches); // на touch перетягування не працює — там кнопки ▲▼
-
-            tr.ondragstart = () => { rowDragSrc = i; tr.classList.add('dragging-row'); };
-            tr.ondragover = (e) => e.preventDefault();
-            tr.ondrop = (e) => {
-                e.preventDefault();
-                if (rowDragSrc === null || rowDragSrc === i) return;
-                const moved = places.splice(rowDragSrc, 1)[0];
-                places.splice(i, 0, moved);
-                rowDragSrc = null;
-                sync();
-            };
-            tr.ondragend = () => { rowDragSrc = null; tr.classList.remove('dragging-row'); };
 
             const url = safeUrl(p.gmapsUrl);
             const link = url
@@ -375,21 +403,22 @@
                 : `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}+${encodeURIComponent(p.coords)}" target="_blank" rel="noopener" class="place-name-link">${esc(p.name)} 🔍</a>`;
 
             tr.innerHTML = `
-                <td style="text-align:center;"><input type="checkbox" ${p.selected ? 'checked' : ''} onclick="handleRowToggle(${i}, this)" style="width:25px; height:25px;"></td>
-                <td style="text-align:center; color:#a0aec0;"><button class="btn-mv" title="Вище" onclick="moveRow(${i}, -1)">▲</button><div style="font-weight:bold;margin:2px 0;">${i + 1}</div><button class="btn-mv" title="Нижче" onclick="moveRow(${i}, 1)">▼</button></td>
-                <td><div class="cell-photo-img" onclick="openGallery(${i})">${thumbHtml(p)}</div></td>
-                <td>
+                <td class="c-chk"><input type="checkbox" ${p.selected ? 'checked' : ''} onclick="handleRowToggle(${i}, this)"></td>
+                <td class="drag-handle" title="Потягніть, щоб змінити порядок"><div class="grip">⠿</div><div class="num">${i + 1}</div></td>
+                <td class="c-photo"><div class="cell-photo-img" onclick="openGallery(${i})">${thumbHtml(p)}</div></td>
+                <td class="c-name">
                     <div>${link}</div>
-                    <div style="font-size:14px; color:#a0aec0; margin-top:5px;">${esc(p.coords)}</div>
-                    ${p.desc ? `<div style="font-size:13px; color:#718096; margin-top:3px;">${esc(p.desc)}</div>` : ''}
+                    <div class="cell-coords">${esc(p.coords)}</div>
+                    ${p.desc ? `<div class="cell-desc">${esc(p.desc)}</div>` : ''}
                 </td>
-                <td>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn-edit" onclick="handleEdit(${i})">✎</button>
-                        <button class="btn-delete" onclick="handleDelete(${i})">✕</button>
-                    </div>
-                </td>`;
+                <td class="c-act"><button class="btn-edit" title="Редагувати" onclick="handleEdit(${i})">✎</button></td>`;
             tbody.appendChild(tr);
+
+            // Зміна порядку перетягуванням за «ручку» ⠿ (мишею і пальцем)
+            tr.querySelector('.drag-handle').addEventListener('pointerdown', ev => startReorder(
+                ev, tr, () => Array.from(tbody.children),
+                (from, to) => { const m = places.splice(from, 1)[0]; places.splice(to, 0, m); sync(); },
+                { ghost: () => rowGhost(tr, i) }));
         });
         const mt = document.getElementById('mainToggle');
         if (mt) mt.checked = places.length > 0 && places.every(p => p.selected);
@@ -397,14 +426,120 @@
         updateMapMarkers();
     }
 
-    function moveRow(i, d) {
-        const j = i + d;
-        if (j < 0 || j >= places.length) return;
-        [places[i], places[j]] = [places[j], places[i]];
-        sync();
+    // ===== Перетягування (миша + дотик, через Pointer Events) =====
+    function findScroller(el) {
+        let n = el.parentElement;
+        while (n && n !== document.body) {
+            const oy = getComputedStyle(n).overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+            n = n.parentElement;
+        }
+        return null;
     }
 
-    // ===== Фото при редагуванні (drag & drop порядку) =====
+    // el — елемент, який тягнемо; getItems() — усі елементи списку в DOM-порядку;
+    // onDrop(from, to) — викликається з новим індексом; opts.grid — сітка (фото), інакше список (рядки).
+    function startReorder(e, el, getItems, onDrop, opts) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.target && e.target.closest && e.target.closest('.del-media')) return;
+        e.preventDefault();
+        const cap = e.currentTarget;
+        const items = getItems();
+        const from = items.indexOf(el);
+        if (from < 0) return;
+        const others = items.filter(x => x !== el);
+        const sx = e.clientX, sy = e.clientY;
+        let lx = sx, ly = sy, pos = from, moved = false, ghost = null, gr = null, mark = null, raf = 0, done = false;
+        const scroller = findScroller(el);
+        try { cap.setPointerCapture(e.pointerId); } catch (err) { }
+
+        const clearMark = () => { if (mark) { mark.el.classList.remove(mark.cls); mark = null; } };
+        const update = () => {
+            let n = 0;
+            for (const o of others) {
+                const r = o.getBoundingClientRect();
+                const before = opts.grid
+                    ? (ly > r.bottom || (ly >= r.top && lx > r.left + r.width / 2))
+                    : (ly > r.top + r.height / 2);
+                if (before) n++;
+            }
+            pos = n;
+            clearMark();
+            if (others.length) {
+                mark = pos < others.length ? { el: others[pos], cls: 'drop-before' } : { el: others[others.length - 1], cls: 'drop-after' };
+                mark.el.classList.add(mark.cls);
+            }
+            if (ghost && gr) {
+                ghost.style.top = (ly - gr.height / 2) + 'px';
+                if (opts.grid) ghost.style.left = (lx - gr.width / 2) + 'px';
+            }
+        };
+        const tick = () => {
+            if (done) return;
+            if (moved && scroller) {                       // автопрокрутка біля країв
+                const sr = scroller.getBoundingClientRect(), zone = 60;
+                let dy = 0;
+                if (ly < sr.top + zone) dy = -Math.ceil((sr.top + zone - ly) / 4);
+                else if (ly > sr.bottom - zone) dy = Math.ceil((ly - (sr.bottom - zone)) / 4);
+                if (dy) scroller.scrollTop += dy;
+            }
+            if (moved) update();
+            raf = requestAnimationFrame(tick);
+        };
+        const onMove = (ev) => {
+            lx = ev.clientX; ly = ev.clientY;
+            if (!moved) {
+                if (Math.hypot(lx - sx, ly - sy) < 5) return;   // це ще тап, а не перетягування
+                moved = true;
+                el.classList.add('is-dragging');
+                ghost = opts.ghost(el);
+                document.body.appendChild(ghost);
+                gr = ghost.getBoundingClientRect();
+            }
+        };
+        const finish = (ev) => {
+            if (done) return;
+            done = true;
+            cancelAnimationFrame(raf);
+            cap.removeEventListener('pointermove', onMove);
+            cap.removeEventListener('pointerup', finish);
+            cap.removeEventListener('pointercancel', finish);
+            try { cap.releasePointerCapture(e.pointerId); } catch (err) { }
+            clearMark();
+            el.classList.remove('is-dragging');
+            if (ghost) ghost.remove();
+            if (moved && ev.type === 'pointerup' && pos !== from) onDrop(from, pos);
+        };
+        cap.addEventListener('pointermove', onMove);
+        cap.addEventListener('pointerup', finish);
+        cap.addEventListener('pointercancel', finish);
+        raf = requestAnimationFrame(tick);
+    }
+
+    function rowGhost(tr, i) {
+        const r = tr.getBoundingClientRect();
+        const g = document.createElement('div');
+        g.className = 'drag-ghost';
+        g.style.width = Math.min(r.width || 300, window.innerWidth - 16) + 'px';
+        g.style.left = Math.max(8, r.left) + 'px';
+        g.style.top = '0px';
+        g.style.padding = '10px 14px';
+        g.style.fontWeight = '600';
+        g.textContent = (i + 1) + '. ' + places[i].name;
+        return g;
+    }
+    function mediaGhost(el) {
+        const r = el.getBoundingClientRect();
+        const g = el.cloneNode(true);
+        g.className = 'media-item-edit drag-ghost';
+        const d = g.querySelector('.del-media'); if (d) d.remove();
+        g.style.width = (r.width || 64) + 'px';
+        g.style.height = (r.height || 64) + 'px';
+        g.style.left = '0px'; g.style.top = '0px';
+        return g;
+    }
+
+    // ===== Фото при редагуванні (перетягування змінює порядок) =====
     function renderMediaEdit() {
         const area = document.getElementById('mediaEditArea');
         area.style.display = currentEditMedia.length ? 'flex' : 'none';
@@ -412,22 +547,14 @@
         currentEditMedia.forEach((m, idx) => {
             const div = document.createElement('div');
             div.className = 'media-item-edit';
-            div.draggable = true;
             const isVideo = (m.type || '').startsWith('video/');
             div.innerHTML = (isVideo
                 ? '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;background:#eee;">🎞</div>'
                 : `<img src="${esc(m.data)}">`) + `<button class="del-media" onclick="removeMedia(${idx})">✕</button>`;
-            div.ondragstart = () => { mediaDragSrc = idx; div.classList.add('dragging'); };
-            div.ondragover = (e) => e.preventDefault();
-            div.ondrop = (e) => {
-                e.preventDefault();
-                if (mediaDragSrc === null || mediaDragSrc === idx) return;
-                const moved = currentEditMedia.splice(mediaDragSrc, 1)[0];
-                currentEditMedia.splice(idx, 0, moved);
-                mediaDragSrc = null;
-                renderMediaEdit();
-            };
-            div.ondragend = () => { mediaDragSrc = null; div.classList.remove('dragging'); };
+            div.addEventListener('pointerdown', ev => startReorder(
+                ev, div, () => Array.from(area.children),
+                (from, to) => { const mv = currentEditMedia.splice(from, 1)[0]; currentEditMedia.splice(to, 0, mv); renderMediaEdit(); },
+                { grid: true, ghost: mediaGhost }));
             area.appendChild(div);
         });
     }
@@ -571,6 +698,7 @@
         document.getElementById('editIndex').value = i;
         document.getElementById('saveBtn').innerText = 'Оновити місце';
         document.getElementById('cancelBtn').style.display = 'inline-flex';
+        document.getElementById('deleteBtn').classList.add('show');
         currentEditMedia = [...(p.media || [])];
         renderMediaEdit();
         removePendingMarker();
@@ -582,6 +710,7 @@
         ['placeName', 'placeCoords', 'placeDesc', 'placeGmapsUrl', 'editIndex'].forEach(id => document.getElementById(id).value = '');
         document.getElementById('saveBtn').innerText = 'Додати місце';
         document.getElementById('cancelBtn').style.display = 'none';
+        document.getElementById('deleteBtn').classList.remove('show');
         currentEditMedia = []; renderMediaEdit();
         removePendingMarker();
     }
@@ -598,7 +727,40 @@
     }
 
     function removeMedia(idx) { currentEditMedia.splice(idx, 1); renderMediaEdit(); }
-    function handleDelete(i) { if (confirm('Видалити?')) { places.splice(i, 1); sync(); } }
+    // Єдине видалення: лише з підтвердженням — з форми редагування (кнопка «Видалити місце повністю») і з меню маркера на карті
+    function confirmDialog(title, text, okLabel) {
+        return new Promise(resolve => {
+            const wrap = document.createElement('div');
+            wrap.className = 'imp-modal';
+            wrap.innerHTML = `<div class="imp-box"><h3>${esc(title)}</h3><p>${esc(text)}</p>
+                <button type="button" class="imp-b imp-r" data-m="ok">${esc(okLabel || 'Так')}</button>
+                <button type="button" class="imp-b" data-m="no">Скасувати</button></div>`;
+            wrap.addEventListener('click', e => {
+                const m = e.target && e.target.dataset && e.target.dataset.m;
+                if (m) { wrap.remove(); resolve(m === 'ok'); }
+                else if (e.target === wrap) { wrap.remove(); resolve(false); }
+            });
+            document.body.appendChild(wrap);
+        });
+    }
+    async function handleDelete(i) {
+        const p = places[i];
+        if (!p) return;
+        const ok = await confirmDialog('Видалити місце?', '«' + p.name + '» буде видалено разом з усіма фото й відео. Цю дію не можна скасувати.', 'Видалити повністю');
+        if (!ok) return;
+        const ed = document.getElementById('editIndex').value;
+        places.splice(i, 1);
+        if (ed !== '') {
+            const e = Number(ed);
+            if (e === i) { clearForm(); toggleMobileForm(false); }
+            else if (e > i) document.getElementById('editIndex').value = e - 1;
+        }
+        sync();
+    }
+    function deleteCurrent() {
+        const v = document.getElementById('editIndex').value;
+        if (v !== '') handleDelete(Number(v));
+    }
     function handleMainToggle(src) { places.forEach(p => p.selected = src.checked); persistSelection(); render(); }
     function handleRowToggle(i, src) { places[i].selected = src.checked; persistSelection(); render(); }
     function sync() { persistPlaces(); persistSelection(); render(); }
@@ -672,6 +834,16 @@
         a.download = name;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+
+    // Одна кнопка «Файл» замість трьох: усе, що пов'язано із збереженням, в одному меню
+    function openFileMenu(btn) {
+        const r = btn.getBoundingClientRect();
+        openCtx(r.left, r.bottom, 'Файл', [
+            { label: '💾 Зберегти сайт (index.html)\nфайл для завантаження на GitHub', action: () => saveToFile() },
+            { label: '⬇ Експорт даних (.json)\nлише місця й фото — для переносу між пристроями', action: () => exportData() },
+            { label: '⬆ Імпорт даних…\nвибрати файл .json', action: () => document.getElementById('importFile').click() }
+        ], { below: true });
     }
 
     // ===== Експорт / імпорт даних (лише місця й фото, без коду) =====
@@ -786,6 +958,7 @@
         fab.classList.remove('editing'); fab.textContent = '＋';
         clone.querySelector('#saveBtn').textContent = 'Додати місце';
         clone.querySelector('#cancelBtn').removeAttribute('style');
+        clone.querySelector('#deleteBtn').classList.remove('show');
         clone.querySelectorAll('.route-parts').forEach(b => b.innerHTML = '');
         clone.querySelectorAll('#gmapsLink,#gmapsLinkDesktop,#gmapsLinkMap').forEach(a => { a.setAttribute('href', '#'); a.removeAttribute('title'); });
         const html = '<!DOCTYPE html>\n' + clone.outerHTML;
@@ -827,7 +1000,8 @@
 
     // ----- Контекстне меню (правий клік / ctrl+клік / двопальцевий тап на Mac / довге натискання на телефоні) -----
     function closeCtx() { if (ctxEl) { ctxEl.remove(); ctxEl = null; } }
-    function openCtx(x, y, title, items) {
+    function openCtx(x, y, title, items, opts) {
+        opts = opts || {};
         const now = Date.now();
         if (now - lastCtxOpen < 400) return;   // contextmenu + довге натискання можуть спрацювати разом
         closeCtx();
@@ -851,7 +1025,7 @@
         document.body.appendChild(m);
         const r = m.getBoundingClientRect();
         const vw = window.innerWidth, vh = window.innerHeight;
-        let left = x + 2, top = isCoarse() ? y - r.height - 24 : y + 2;   // на телефоні меню над пальцем
+        let left = x + 2, top = (isCoarse() && !opts.below) ? y - r.height - 24 : y + 2;   // на телефоні меню над пальцем
         if (top < 8) top = y + 24;
         if (left + r.width > vw - 8) left = x - r.width - 2;
         if (top + r.height > vh - 8) top = vh - r.height - 8;
@@ -1139,7 +1313,9 @@
         const modal = $('mediaModal');
         const galleryOpen = modal && modal.style.display === 'flex';
         if (e.key === 'Escape') {
-            if (ctxEl) closeCtx();
+            const dlg = document.querySelector('.imp-modal [data-m="no"], .imp-modal [data-m="cancel"]');
+            if (dlg) dlg.click();
+            else if (ctxEl) closeCtx();
             else if (galleryOpen) { $('mediaContainer').innerHTML = ''; modal.style.display = 'none'; }
             else closeMobileMap();
         } else if (galleryOpen && e.key === 'ArrowRight') nextPhoto();
