@@ -312,6 +312,28 @@
             :root { --cols: 40px 14px 30px 100px minmax(0, 1fr); }
         }
         .modal { background: #000 !important; }
+
+        /* ===== Рядок місця (фінальна розкладка): зліва зверху чекбокс-серце, під ним крапки з цифрою; фото більше ===== */
+        :root { --lw: 56px; --pw: 184px; }
+        .swipe-content { grid-template-columns: var(--lw) var(--pw) minmax(0, 1fr); }
+        .c-left { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 2px; min-width: 0; }
+        .c-drag { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 0; }
+        .c-drag .drag-handle { align-self: auto; margin: 0; padding: 8px 0; display: flex; align-items: center; }
+        .c-drag .drag-handle.grip { justify-content: flex-end; font-size: 22px; padding-right: 1px; }
+        .c-drag .drag-handle.num { justify-content: flex-start; font-size: 17px; font-weight: 700; padding-left: 1px; }
+        .cell-photo-img { width: 176px; height: 176px; }
+        .c-chk input, .list-head #mainToggle { -webkit-appearance: none; appearance: none; width: 30px; height: 30px; margin: 0; border: 2px solid #9aa5b1; border-radius: 7px; background-color: #fff; background-position: center; background-repeat: no-repeat; background-size: contain; cursor: pointer; }
+        .c-chk input:checked, .list-head #mainToggle:checked { border-color: transparent; background-color: transparent; background-size: 122%; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23e74c3c' d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/></svg>"); animation: heartPop .28s ease; }
+        @keyframes heartPop { 0% { transform: scale(.6); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+        /* форма редагування: кола з відбитками без обводки і без підписів */
+        .action-buttons .finger-btn { border: none; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+        @media (max-width: 700px) {
+            :root { --lw: 46px; --pw: 132px; }
+            .c-chk input, .list-head #mainToggle { width: 28px; height: 28px; }
+            .c-drag .drag-handle.grip { font-size: 19px; }
+            .c-drag .drag-handle.num { font-size: 15px; }
+            .cell-photo-img { width: 126px; height: 126px; }
+        }
     </style>
 </head>
 <body>
@@ -400,8 +422,8 @@
             </div>
             <div id="mediaEditArea"></div>
             <div class="action-buttons">
-                <div class="fa-item"><button id="saveBtn" type="button" class="finger-btn finger-green" onclick="handleSave()" title="Додати місце" aria-label="Додати місце"><span class="finger fp-green" role="img"></span></button><span class="fa-cap" id="saveCaption">Додати</span></div>
-                <div class="fa-item"><button id="cancelBtn" type="button" class="finger-btn finger-red" onclick="cancelEdit()" title="Скасувати" aria-label="Скасувати"><span class="finger fp-red" role="img"></span></button><span class="fa-cap">Скасувати</span></div>
+                <div class="fa-item"><button id="saveBtn" type="button" class="finger-btn finger-green" onclick="handleSave()" title="Додати місце" aria-label="Додати місце"><span class="finger fp-green" role="img"></span></button></div>
+                <div class="fa-item"><button id="cancelBtn" type="button" class="finger-btn finger-red" onclick="cancelEdit()" title="Скасувати" aria-label="Скасувати"><span class="finger fp-red" role="img"></span></button></div>
             </div>
         </div>
     </div>
@@ -515,9 +537,12 @@
                     <button type="button" class="act act-del" data-a="del" title="Видалити">🗑<span>Видалити</span></button>
                 </div>
                 <div class="swipe-content">
-                    <div class="c-chk"><input type="checkbox" ${p.selected ? 'checked' : ''} onclick="handleRowToggle(${i}, this)"></div>
-                    <div class="drag-handle grip" title="Потягніть, щоб змінити порядок">⠿</div>
-                    <div class="drag-handle num" title="Потягніть, щоб змінити порядок">${i + 1}</div>
+                    <div class="c-left">
+                        <div class="c-chk"><input type="checkbox" ${p.selected ? 'checked' : ''} onclick="handleRowToggle(${i}, this)"></div>
+                        <div class="c-drag">
+                            <span class="drag-handle grip" title="Потягніть, щоб змінити порядок">⠿</span><span class="drag-handle num" title="Потягніть, щоб змінити порядок">${i + 1}</span>
+                        </div>
+                    </div>
                     <div class="c-photo"><div class="cell-photo-img" onclick="openGallery(${i})">${thumbHtml(p)}</div></div>
                     <div class="c-name">
                         <div>${link}</div>
@@ -1055,7 +1080,7 @@
         const b = document.getElementById('saveBtn');
         const t = isEdit ? 'Оновити місце' : 'Додати місце';
         b.title = t; b.setAttribute('aria-label', t);
-        document.getElementById('saveCaption').textContent = isEdit ? 'Оновити' : 'Додати';
+        const cap = document.getElementById('saveCaption'); if (cap) cap.textContent = isEdit ? 'Оновити' : 'Додати';
     }
     // Скасувати: вийти з режиму редагування й повернутися до реєстру місць (панель закривається, місце не змінюється)
     function cancelEdit() {
@@ -1451,7 +1476,7 @@
         clone.querySelector('#sidebar').classList.remove('open');
         const fab = clone.querySelector('#fabBtn');
         fab.classList.remove('editing');
-        clone.querySelector('#saveCaption').textContent = 'Додати';
+        const capc = clone.querySelector('#saveCaption'); if (capc) capc.textContent = 'Додати';
         clone.querySelector('#saveBtn').title = 'Додати місце'; clone.querySelector('#saveBtn').setAttribute('aria-label', 'Додати місце');
         const rtg = clone.querySelector('#returnToggle'); if (rtg) rtg.removeAttribute('style');
         clone.querySelector('.content-area').removeAttribute('style');
