@@ -396,6 +396,15 @@
         }
         .settings-page label { text-transform: none; font-size: 16px; color: #2d3748; font-weight: 400; letter-spacing: 0; margin: 0; }
         body.settings-open .fab-add { display: none; }
+
+        /* ===== Налаштування: лише значок + кнопка закриття; позиція GPS як старт маршруту ===== */
+        .settings-bar { justify-content: space-between; }
+        .settings-gear { font-size: 30px; line-height: 1; }
+        .settings-close { width: 46px; height: 46px; padding: 0; border-radius: 50%; background: #e74c3c; font-size: 22px; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+        .mobile-controls .btn-save-file[aria-label="Налаштування"], .top-controls .btn-save-file[aria-label="Налаштування"] { font-size: 16px !important; padding: 5px 10px !important; line-height: 1.1; }
+        .gps-hit { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .gps-dot.start { box-shadow: 0 0 0 4px rgba(231,76,60,.85), 0 2px 6px rgba(0,0,0,.4); }
+        .lh-count.start-on { cursor: pointer; background: #fde8e6; color: #b3362a; }
     </style>
 </head>
 <body>
@@ -421,7 +430,7 @@
 </div>
 <div id="settingsPage" class="settings-page" role="dialog" aria-label="Налаштування">
     <div class="settings-box">
-        <div class="settings-bar"><button type="button" class="settings-back" onclick="closeSettings()">← Назад</button><h2>⚙ Налаштування</h2></div>
+        <div class="settings-bar"><span class="settings-gear" aria-hidden="true">⚙</span><button type="button" class="settings-close" onclick="closeSettings()" aria-label="Закрити" title="Закрити">✕</button></div>
         <div class="settings-section">
             <h3>Файли</h3>
             <button type="button" class="set-btn" onclick="settingsAction('save')">💾 Зберегти сайт (index.html)</button>
@@ -444,7 +453,7 @@
         <span class="mobile-title">📍 MyMaps</span>
         <div class="mobile-controls"><button class="btn-map-open" onclick="openMobileMap()">🗺 Карта</button>
             <a id="gmapsLink" class="link-btn btn-export" href="#" target="_blank">🗺 Маршрут</a><span class="route-parts"></span>
-            <button class="btn-save-file" onclick="openSettings()">⚙ Налаштування</button>
+            <button class="btn-save-file" onclick="openSettings()" title="Налаштування" aria-label="Налаштування">⚙</button>
         </div>
     </div>
         <div class="search-bar" id="searchBar">
@@ -470,7 +479,7 @@
             <h1>📍 Додати місце</h1>
             <div class="top-controls desktop-only">
                 <a id="gmapsLinkDesktop" class="link-btn btn-export" href="#" target="_blank">Route Google Map</a><span class="route-parts"></span>
-                <button class="btn-save-file" onclick="openSettings()">⚙ Налаштування</button>
+                <button class="btn-save-file" onclick="openSettings()" title="Налаштування" aria-label="Налаштування">⚙</button>
             </div>
         </div>
         <div class="form-container">
@@ -482,7 +491,7 @@
                 </div>
                 <div class="input-wrapper">
                     <label>Координати</label>
-                    <input type="text" id="placeCoords" placeholder="41.047, 19.496">
+                    <input type="text" id="placeCoords" placeholder="41.047, 19.496 або Plus Code" title="Десяткові координати, градуси, повний Plus Code (8FGXPFC9+GX) або короткий з містом (PFC9+GX9, Fier)">
                 </div>
                 <div class="input-wrapper">
                     <label>Опис</label>
@@ -1166,11 +1175,120 @@
     }
 
     // ===== Форма =====
-    function parseCoords(str) {
-        const parts = String(str).replace(/\s/g, '').split(',');
-        const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
-        if (parts.length !== 2 || isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    // ===== Plus Codes (Open Location Code) — формат «PFC9+GX9, Fier» та «8FGXPFC9+GX» з Google Maps =====
+    const OLC_ALPHA = '23456789CFGHJMPQRVWX';
+    function olcDecode(code) {                              // повний код → центр області [lat, lng]
+        const c = String(code).toUpperCase().replace('+', '').replace(/0+$/, '');
+        if (c.length < 2 || c.length > 15 || [...c].some(ch => OLC_ALPHA.indexOf(ch) < 0)) return null;
+        const PP = 8000, FLAT = 25000000, FLNG = 8192000;
+        let nLat = -90 * PP, nLng = -180 * PP, gLat = 0, gLng = 0;
+        let digits = Math.min(c.length, 10), pv = 160000;
+        for (let i = 0; i < digits; i += 2) {
+            nLat += OLC_ALPHA.indexOf(c[i]) * pv;
+            nLng += OLC_ALPHA.indexOf(c[i + 1] === undefined ? '2' : c[i + 1]) * pv;
+            if (i < digits - 2) pv /= 20;
+        }
+        let latP = pv / PP, lngP = pv / PP;
+        if (c.length > 10) {
+            let rowpv = 625, colpv = 256;
+            digits = Math.min(c.length, 15);
+            for (let i = 10; i < digits; i++) {
+                const dv = OLC_ALPHA.indexOf(c[i]);
+                gLat += Math.floor(dv / 4) * rowpv; gLng += (dv % 4) * colpv;
+                if (i < digits - 1) { rowpv /= 5; colpv /= 4; }
+            }
+            latP = rowpv / FLAT; lngP = colpv / FLNG;
+        }
+        return [Math.min(nLat / PP + gLat / FLAT + latP / 2, 90), nLng / PP + gLng / FLNG + lngP / 2];
+    }
+    function olcPrefix(lat, lng, nchars) {                  // перші символи коду для точки (потрібні, щоб «добудувати» короткий код)
+        lat = Math.min(90 - 1e-9, Math.max(-90, lat));
+        lng = ((lng + 180) % 360 + 360) % 360 - 180;
+        let latV = Math.floor((lat + 90) * 8000 + 1e-7), lngV = Math.floor((lng + 180) * 8000 + 1e-7);
+        const dl = [], dg = [];
+        for (let i = 0; i < 5; i++) { dl.unshift(latV % 20); latV = Math.floor(latV / 20); dg.unshift(lngV % 20); lngV = Math.floor(lngV / 20); }
+        let s = '';
+        for (let i = 0; i < 5; i++) s += OLC_ALPHA[dl[i]] + OLC_ALPHA[dg[i]];
+        return s.slice(0, nchars);
+    }
+    function olcRecover(shortCode, refLat, refLng) {        // короткий код + орієнтир → найближча точка
+        const sc = shortCode.toUpperCase(), sep = sc.indexOf('+');
+        const padLen = 8 - sep;
+        const resolution = Math.pow(20, 2 - padLen / 2), half = resolution / 2;
+        const c = olcDecode(olcPrefix(refLat, refLng, padLen) + sc);
+        if (!c) return null;
+        let [lat, lng] = c;
+        if (refLat + half < lat && lat - resolution >= -90) lat -= resolution;
+        else if (refLat - half > lat && lat + resolution <= 90) lat += resolution;
+        if (refLng + half < lng) lng -= resolution; else if (refLng - half > lng) lng += resolution;
         return [lat, lng];
+    }
+    function parseShortPlusCode(str) {                      // «PFC9+GX9» або «PFC9+GX9, Fier»
+        const m = String(str).trim().match(/^([23456789CFGHJMPQRVWX]{2,6})\+([23456789CFGHJMPQRVWX]{2,7})(?:\s*,?\s*(.+))?$/i);
+        if (!m || m[1].length % 2) return null;
+        return { code: (m[1] + '+' + m[2]).toUpperCase(), locality: (m[3] || '').trim() };
+    }
+    // Підтримувані записи: «41.047, 19.496», «41.047 19.496», «40°43'16.5"N 19°28'11.5"E», повний Plus Code «8FGXPFC9+GX»
+    function parseCoordsDetailed(str) {
+        const s = String(str == null ? '' : str).trim();
+        if (!s) return null;
+        const ok = (la, ln) => (isFinite(la) && isFinite(ln) && Math.abs(la) <= 90 && Math.abs(ln) <= 180) ? [la, ln] : null;
+        const parts = s.replace(/\s/g, '').split(',');
+        if (parts.length === 2 && /^-?\d+(\.\d+)?$/.test(parts[0]) && /^-?\d+(\.\d+)?$/.test(parts[1])) {
+            const c = ok(parseFloat(parts[0]), parseFloat(parts[1])); if (c) return { c, kind: 'dec' };
+        }
+        let m = s.match(/^(-?\d+(?:\.\d+)?)[\s;]+(-?\d+(?:\.\d+)?)$/);
+        if (m) { const c = ok(parseFloat(m[1]), parseFloat(m[2])); if (c) return { c, kind: 'dec' }; }
+        m = s.match(/^([23456789CFGHJMPQRVWX]{8})\+([23456789CFGHJMPQRVWX]{0,7})$/i);
+        if (m && m[2].length !== 1) { const c = olcDecode(s); if (c) { const k = ok(c[0], c[1]); if (k) return { c: k, kind: 'plus' }; } }
+        m = s.match(/^(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:["″]|'')\s*([NSns])[\s,;]*(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:["″]|'')\s*([EWew])$/);
+        if (m) {
+            const la = (+m[1] + m[2] / 60 + m[3] / 3600) * (/s/i.test(m[4]) ? -1 : 1);
+            const ln = (+m[5] + m[6] / 60 + m[7] / 3600) * (/w/i.test(m[8]) ? -1 : 1);
+            const c = ok(la, ln); if (c) return { c, kind: 'dms' };
+        }
+        return null;
+    }
+    function parseCoords(str) { const d = parseCoordsDetailed(str); return d ? d.c : null; }
+    const coordsToString = c => c[0].toFixed(6) + ', ' + c[1].toFixed(6);
+    async function geocodeLocality(q) {                     // «Fier» → орієнтир для короткого Plus Code
+        try {
+            const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const t = setTimeout(() => ctrl && ctrl.abort(), 5000);
+            const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q), ctrl ? { signal: ctrl.signal } : undefined);
+            clearTimeout(t);
+            const d = await res.json();
+            if (d && d[0]) return [parseFloat(d[0].lat), parseFloat(d[0].lon)];
+        } catch (e) { }
+        return null;
+    }
+    function fallbackReference() {                          // коли назви населеного пункту немає/не знайдено — центр карти або центр ваших місць
+        if (map) { const c = map.getCenter(); return [c.lat, c.lng]; }
+        const pts = places.map(p => parseCoords(p.coords)).filter(Boolean);
+        if (!pts.length) return [41, 20];
+        return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+    }
+    // Перетворює те, що вписано в поле «Координати», на десяткові координати «lat, lng»
+    async function normalizeCoordsField() {
+        const el = document.getElementById('placeCoords');
+        const raw = el.value.trim();
+        if (!raw) return false;
+        const det = parseCoordsDetailed(raw);
+        if (det) {
+            if (det.kind !== 'dec') { el.value = coordsToString(det.c); el.dispatchEvent(new Event('input', { bubbles: true })); toast('Координати перетворено на десяткові'); }
+            return true;
+        }
+        const sp = parseShortPlusCode(raw);
+        if (!sp) return false;
+        toast('Визначаю місце за Plus Code…');
+        let ref = sp.locality ? await geocodeLocality(sp.locality) : null;
+        if (!ref) ref = fallbackReference();
+        const c = olcRecover(sp.code, ref[0], ref[1]);
+        if (!c) return false;
+        el.value = coordsToString(c);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        toast('Plus Code перетворено на координати');
+        return true;
     }
 
     // Звук штампа (синтез через WebAudio, без файлів): глухий удар + шурхіт гуми + легкий відскок
@@ -1226,7 +1344,7 @@
         const name = document.getElementById('placeName').value.trim();
         const coords = document.getElementById('placeCoords').value.trim();
         if (!name || !coords) { alert('Заповніть назву та координати'); return false; }
-        if (!parseCoords(coords)) { alert('Координати мають вигляд: 41.047, 19.496'); return false; }
+        if (!parseCoords(coords)) { alert('Координати: 41.047, 19.496 — або Plus Code (наприклад 8FGXPFC9+GX чи PFC9+GX9, Fier)'); return false; }
         return true;
     }
     // Нове місце ставимо поряд зі схожим за територією: спершу те саме місто/район (за назвою найближчого
@@ -1276,7 +1394,8 @@
         if (!validateForm()) return;
         if (!opts.silent) playStamp();            // штамп — лише коли збереження підтверджено
         const name = document.getElementById('placeName').value.trim();
-        const coords = document.getElementById('placeCoords').value.trim();
+        let coords = document.getElementById('placeCoords').value.trim();
+        { const dd = parseCoordsDetailed(coords); if (dd && dd.kind !== 'dec') coords = coordsToString(dd.c); }
         const eIdx = document.getElementById('editIndex').value;
         const old = eIdx !== '' ? places[Number(eIdx)] : null;
         const data = {
@@ -1399,6 +1518,14 @@
     let pressBusy = false;
     function stampPress(zone) {
         if (pressBusy) return;
+        if (zone === 'green') {
+            const raw = document.getElementById('placeCoords').value;
+            if (!parseCoords(raw) && parseShortPlusCode(raw)) {                // короткий Plus Code: спершу визначаємо координати
+                pressBusy = true;
+                normalizeCoordsField().then(ok => { pressBusy = false; if (ok) stampPress('green'); else validateForm(); }, () => { pressBusy = false; });
+                return;
+            }
+        }
         const wrap = document.getElementById('stampHeart');
         let nearP = null;
         if (zone === 'green') {
@@ -1499,7 +1626,8 @@
         const shouldReturn = document.getElementById('returnToStart')?.checked || document.getElementById('returnToStartDesktop')?.checked || false;
         const clean = c => c.replace(/\s+/g, '');
         const pts = sel.map(p => clean(p.coords));
-        if (shouldReturn) pts.push(pts[0]);
+        if (startFromMe && startSnap) pts.unshift(startSnap[0].toFixed(6) + ',' + startSnap[1].toFixed(6));
+        if (shouldReturn && pts.length >= 2) pts.push(pts[0]);        // назад — на початок маршруту (мою позицію або першу вибрану точку)
         const STEP = 10, links = [];
         let i = 0;
         while (true) {
@@ -1578,13 +1706,17 @@
         const el = document.getElementById('listCount');
         if (!el) return;
         const n = places.filter(p => p.selected).length;
+        const eff = n + (startFromMe && startSnap ? 1 : 0);                   // точки маршруту (разом із моєю позицією)
         const rt = document.getElementById('returnToggle');
-        if (rt) rt.style.display = n ? 'inline-flex' : 'none';               // «Повернутися на старт» лише коли щось вибрано
+        if (rt) rt.style.display = eff >= 2 ? 'inline-flex' : 'none';        // «Повернутися на старт» — лише коли в маршруті є 2 і більше точок
         if (!n) { el.style.display = 'none'; el.textContent = ''; return; }   // лічильник лише коли щось вибрано
         el.style.display = 'inline-block';
-        const tm = (routeTotals && n >= 2) ? ' · ' + (routeTotals.estimated ? '≈ ' : '') + fmtTime(routeTotals.duration) : '';
-        el.textContent = n + '/' + places.length + tm;           // + загальний час у дорозі
-        el.title = 'Вибрано / усього місць' + (tm ? ' · загальний час у дорозі' : '');
+        const tm = (routeTotals && eff >= 2)
+            ? ' · ' + (routeTotals.estimated ? '≈ ' : '') + fmtTime(routeTotals.duration) + ' · ' + fmtKm(routeTotals.distance)
+            : '';
+        el.textContent = (startFromMe && startSnap ? '🚩 ' : '') + n + '/' + places.length + tm;     // + загальний час і відстань
+        el.classList.toggle('start-on', !!(startFromMe && startSnap));
+        el.title = 'Вибрано / усього місць' + (tm ? ' · загальний час і відстань' : '') + (startFromMe ? ' · торкніться, щоб скасувати старт від моєї позиції' : '');
     }
     // «Повернутися на старт»: перемикач. Якщо увімкнено — і маршрут Google, і лінія на карті
     // добудовують зворотний відрізок до ПЕРШОЇ вибраної точки.
@@ -1603,6 +1735,11 @@
         const lab = document.getElementById('returnToggle');
         if (lab) lab.classList.toggle('on', el.checked);
     }
+
+    (function initCounterTap() {
+        const el = document.getElementById('listCount');
+        if (el) el.addEventListener('click', () => { if (startFromMe) setStartFromMe(false); });
+    })();
 
     // ===== Пошук: з'являється свайпом вниз угорі списку, шукає від 3 символів =====
     const normText = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1762,8 +1899,10 @@
         list.forEach(p => {
             if (!p || typeof p !== 'object') return;
             const name = String(p.name ?? '').trim();
-            const coords = String(p.coords ?? '').trim();
-            if (!name || !parseCoords(coords)) return;
+            let coords = String(p.coords ?? '').trim();
+            const dd = parseCoordsDetailed(coords);
+            if (!name || !dd) return;
+            if (dd.kind !== 'dec') coords = coordsToString(dd.c);
             const media = (Array.isArray(p.media) ? p.media : [])
                 .filter(m => m && typeof m.data === 'string' && /^data:(image|video)\//.test(m.data))
                 .map(m => ({ type: String(m.type || m.data.slice(5, m.data.indexOf(';'))), data: m.data }));
@@ -2023,6 +2162,8 @@
         toast('Введіть назву й натисніть «Додати місце»');
     }
     // Ручна зміна координат у формі переміщує зелений маркер
+    $('placeCoords').addEventListener('change', () => { normalizeCoordsField(); });
+    $('placeCoords').addEventListener('paste', () => setTimeout(() => normalizeCoordsField(), 60));
     $('placeCoords').addEventListener('input', () => {
         if ($('editIndex').value !== '') return;
         const c = parseCoords($('placeCoords').value);
@@ -2200,6 +2341,26 @@
 
     // ===== Поточне місце за GPS: зелена точка =====
     let gpsMarker = null, gpsCircle = null, gpsWatch = null, lastGps = null;
+    function gpsIcon() {
+        return L.divIcon({ className: '', html: `<div class="gps-hit"><div class="gps-dot${startFromMe ? ' start' : ''}"></div></div>`, iconSize: [40, 40], iconAnchor: [20, 20] });
+    }
+    function setStartFromMe(on) {
+        if (on && !lastGps) { toast('Ще немає GPS-позиції — дозвольте доступ до місцезнаходження'); return; }
+        startFromMe = !!on;
+        startSnap = on ? lastGps.ll.slice() : null;           // фіксуємо позицію на момент вибору; «Оновити» — щоб узяти нову
+        if (gpsMarker) gpsMarker.setIcon(gpsIcon());
+        routeKey = '';
+        updateLinks(); updateListCount();
+        toast(on ? '🚩 Старт маршруту — ваше місцезнаходження' : 'Старт маршруту — перша вибрана точка');
+    }
+    function openGpsMenu(x, y) {
+        openCtx(x, y, 'Ви тут (GPS)', [
+            startFromMe
+                ? { label: '✖ Не починати маршрут звідси', action: () => setStartFromMe(false) }
+                : { label: '🚩 Почати маршрут звідси', action: () => setStartFromMe(true) },
+            { label: '↻ Оновити мою позицію' + (startFromMe ? ' як старт' : ''), action: () => { startGps(); if (startFromMe) setStartFromMe(true); else if (lastGps && map) map.setView(lastGps.ll, Math.max(map.getZoom(), 15)); } }
+        ]);
+    }
     function startGps() {
         if (!navigator.geolocation || gpsWatch !== null) return;
         gpsWatch = navigator.geolocation.watchPosition(pos => {
@@ -2207,7 +2368,8 @@
             lastGps = { ll, acc: pos.coords.accuracy };
             if (!map) return;
             if (!gpsMarker) {
-                gpsMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="gps-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] }), interactive: false, keyboard: false, zIndexOffset: 900 }).addTo(map);
+                gpsMarker = L.marker(ll, { icon: gpsIcon(), interactive: true, keyboard: false, zIndexOffset: 900 }).addTo(map);
+                gpsMarker.on('click', ev => { if (Date.now() - lastCtxOpen < 700) return; const oe = ev.originalEvent || {}; openGpsMenu(oe.clientX || 100, oe.clientY || 100); });
                 gpsCircle = L.circle(ll, { radius: pos.coords.accuracy, color: '#2ecc71', weight: 1, fillColor: '#2ecc71', fillOpacity: 0.12, interactive: false }).addTo(map);
             } else {
                 gpsMarker.setLatLng(ll);
@@ -2255,8 +2417,10 @@
         const x = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * t) * Math.cos(b[0] * t) * Math.sin(dLng / 2) ** 2;
         return 2 * R * Math.asin(Math.sqrt(x));
     }
+    let startFromMe = false, startSnap = null;               // старт маршруту від поточного місцезнаходження (вибирається на карті)
     function routePoints() {
         const pts = places.filter(p => p.selected).map(p => parseCoords(p.coords)).filter(Boolean);
+        if (startFromMe && startSnap) pts.unshift(startSnap);
         const ret = (document.getElementById('returnToStart') && document.getElementById('returnToStart').checked) ||
                     (document.getElementById('returnToStartDesktop') && document.getElementById('returnToStartDesktop').checked);
         if (ret && pts.length >= 2) pts.push(pts[0]);
@@ -2438,12 +2602,12 @@
         // добудований зворотний відрізок (повернення на старт): у підсумок входить, а підпис на карті для нього не ставимо
         const closing = pts.length >= 3 && pts[0] === pts[pts.length - 1];
         const est = estimateRoute(pts);
-        routeTotals = { duration: est.legs.reduce((s, l) => s + l.duration, 0), estimated: true };
+        routeTotals = { duration: est.legs.reduce((s, l) => s + l.duration, 0), distance: est.legs.reduce((s, l) => s + l.distance, 0), estimated: true };
         updateListCount();
         if (map) drawRoute(est, pts, closing);               // одразу показуємо оцінку
         const real = await fetchRoute(pts);                  // потім замінюємо справжнім маршрутом
         if (key !== routeKey || !real) return;               // вибір змінився або сервіс недоступний — лишається оцінка
-        routeTotals = { duration: real.legs.reduce((s, l) => s + l.duration, 0), estimated: false };
+        routeTotals = { duration: real.legs.reduce((s, l) => s + l.duration, 0), distance: real.legs.reduce((s, l) => s + l.distance, 0), estimated: false };
         updateListCount();
         if (map) drawRoute(real, pts, closing);
     }
