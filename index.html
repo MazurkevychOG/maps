@@ -47,6 +47,9 @@
 
             /* Таблиця займає весь екран зверху */
             .content-area { width: 100%; flex: 1; overflow-y: auto; font-size: 16px; border-left: none; border-bottom: 1px solid #eaeaea; }
+.content-area::-webkit-scrollbar {
+    width: 8px;
+}
 
             /* Форма — фіксована панель знизу, згорнута за замовчуванням */
             .sidebar { width: 100%; flex-shrink: 0; padding: 0; box-shadow: 0 -3px 15px rgba(0,0,0,0.12); order: 2; max-height: 55dvh; overflow-y: auto; display: none; }
